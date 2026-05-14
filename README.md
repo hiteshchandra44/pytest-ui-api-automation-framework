@@ -1,6 +1,6 @@
 # Pytest Automation Framework — UI & API Testing
 
-Enterprise-oriented **pytest** automation for the **Expand Testing Notes** practice application. This repository gives new QA engineers a clear path from clone to green runs, with separate configurations for UI, API, full-suite, and stability validation.
+Enterprise-oriented **pytest** automation for the **Expand Testing Notes** practice application. This repository gives new QA engineers a clear path from clone to green runs, with three supported execution profiles: **UI**, **API**, and **stability** (combined collection).
 
 ---
 
@@ -20,7 +20,7 @@ Automates **end-to-end UI** flows (Selenium) and **REST API** checks (`requests`
 | Resilience | **`pytest-rerunfailures`** on UI/API configs (not on stability — flakiness stays visible) |
 | Scale | **`pytest-xdist`** for parallel workers where configured |
 | Reporting | **`pytest-html`** self-contained HTML + timestamped names via `conftest.py` |
-| Ops | Batch/shell helpers, optional `python -m utilities.run_tests` launcher |
+| Ops | Batch/shell helpers, optional `python -m utilities.run_tests` launcher (`ui`, `api`, `stability` only) |
 
 ### Tech stack
 
@@ -34,8 +34,9 @@ Automates **end-to-end UI** flows (Selenium) and **REST API** checks (`requests`
 |------|--------|-------------|
 | **UI** | `tests/ui/` | Login, registration, notes CRUD in the browser |
 | **API** | `tests/api/` | Auth, users, notes REST contracts |
-| **Stability** | Full `tests/` tree (**75** collected tests: **25** UI + **50** API) | Single pass with parallelism, **no** reruns — reliability signal |
-| **Full** | `pytest_all.ini` | Combined UI + API with auto workers + reruns |
+| **Stability** | Entire `tests/` tree (combined UI + API collection) | Single pass with parallelism, **no** reruns — reliability signal |
+
+Official execution profiles use **`pytest_ui.ini`**, **`pytest_api.ini`**, and **`pytest_stability.ini`** only.
 
 ---
 
@@ -43,8 +44,8 @@ Automates **end-to-end UI** flows (Selenium) and **REST API** checks (`requests`
 
 - **Pytest-first layout** — discovery under `tests/`, shared hooks in root `conftest.py`.
 - **Parallel execution** — `pytest-xdist` (`-n 4`, `-n 8`, or `-n auto` depending on config/script).
-- **Stability-oriented runs** — `pytest_stability.ini` runs the full collection with **`-n 4`** and **omits `--reruns`** so intermittent failures are not masked.
-- **HTML reporting** — timestamped files such as `reports/ui_report_YYYY-MM-DD_HH-MM-SS.html` (prefix matches the active `.ini`: `ui`, `api`, `stability`, `all`).
+- **Stability-oriented runs** — `pytest_stability.ini` runs the combined collection with **`-n 4`** and **omits `--reruns`** so intermittent failures are not masked.
+- **HTML reporting** — timestamped files such as `reports/ui_report_YYYY-MM-DD_HH-MM-SS.html` (prefix matches the active profile: `ui`, `api`, or `stability`).
 - **Logging** — pytest file + CLI logs under `reports/`; application-style logs from `utilities/logger.py` → `logs/test_YYYY-MM-DD.log`.
 - **Config-driven execution** — URLs, timeouts, browser, headless, and credentials in `config/config.ini`; browser override via **`--browser`**.
 - **Scalable structure** — `pages/`, `tests/`, `utilities/`, `testdata/` separation.
@@ -99,7 +100,6 @@ Pytest-automation/
 ├── pytest_ui.ini
 ├── pytest_api.ini
 ├── pytest_stability.ini
-├── pytest_all.ini
 ├── requirements.txt
 ├── run_tests.bat / run_tests.sh
 ├── run_10_times_api-ui.bat
@@ -112,7 +112,7 @@ Pytest-automation/
 
 | Location | Purpose | What belongs here | How to use it |
 |----------|---------|-------------------|---------------|
-| **`config/`** | Single source for non-secret *defaults* and environment-specific values | `config.ini` | Edit URLs, timeouts, `headless`, and test account fields. Prefer a **local** copy or secret store for real credentials in forked repos. |
+| **`config/`** | Single source for non-secret *defaults* and environment-specific values | `config.ini` | Edit URLs, timeouts, `headless`, and **your** test account fields (see [Configure Your Test Credentials](#8-configure-your-test-credentials)). Prefer a **local** copy or secret store for real credentials in forked repos. |
 | **`pages/`** | UI abstraction (locators + actions) | One page class per major screen | Add/modify locators and navigation here — **not** scattered inside tests. |
 | **`tests/ui/`** | Browser tests | `test_*.py`, optional `conftest.py` for UI-only hooks | New UI scenarios: new `test_<feature>.py`, reuse `driver` + page objects. |
 | **`tests/api/`** | HTTP tests | `test_*_api.py` | New endpoints: extend or add modules; use `api_client` / `auth_token`. |
@@ -190,29 +190,56 @@ Using **`python -m <module>`** guarantees that **the same Python executable** th
 
 ---
 
-## 8. ⚙️ Environment configuration
+## 8. Configure Your Test Credentials
+
+**Before running any tests**, you **must** edit **`config/config.ini`** and set **your own** valid practice-account **email** (`username`) and **password** values. The framework **does not work** without credentials that match a real registered user on the Notes app.
+
+### Why this file matters
+
+The same settings drive:
+
+- **UI login tests** — browser flows sign in with `[api]` user fields read by page objects and fixtures.
+- **API login and authentication** — HTTP tests obtain tokens using the configured account.
+- **`auth_token` fixture** — logs in via the API using `[api]` `username` / `password`.
+- **Notes-related API-backed flows** — authenticated requests expect a valid token tied to your account.
+- **Stability runs** — combined UI + API collection still depends on this account for every path that authenticates.
+
+### Example (`[api]` section)
+
+Replace the placeholders with **your** registered test email and passwords (keep `wrong_password` as an intentionally invalid value for negative tests if your suite expects it):
+
+```ini
+[api]
+username = your_email@example.com
+password = YourPassword123
+wrong_password = WrongPassword123
+default_password = YourPassword123
+```
+
+> **Security**  
+> Treat `config/config.ini` as **sensitive** in real projects. Use dedicated test accounts, rotate passwords after sharing, and avoid committing production secrets. For enterprise setups, consider environment variables or a secret manager and thin `config_reader` extensions.
+
+---
+
+## 9. ⚙️ Environment configuration
 
 ### Pytest INI files
 
 | File | Role |
 |------|------|
-| **`pytest.ini`** | Default project pytest settings (`testpaths = tests`, `-n auto`, reruns). |
+| **`pytest.ini`** | Default project pytest settings (`testpaths = tests`, optional parallelism/reruns when no `-c` is passed). |
 | **`pytest_ui.ini`** | UI only (`tests/ui`), reruns enabled, **no** default `-n` in file — parallelism is optional on CLI. |
 | **`pytest_api.ini`** | API only (`tests/api`), reruns enabled. |
-| **`pytest_stability.ini`** | Full tree (`tests`), **`-n 4`**, **no reruns** — exposes flakiness. |
-| **`pytest_all.ini`** | Full tree, **`-n auto`**, reruns — fast regression with worker count tied to CPU. |
+| **`pytest_stability.ini`** | Entire `tests/` tree, **`-n 4`**, **no reruns** — exposes flakiness. |
 
-### `config/config.ini`
+### `config/config.ini` (beyond credentials)
 
 Controls:
 
 - **`[browser]`** — `browser` (`chrome` / `firefox`), `headless` (`true` / `false`).
 - **`[urls]`** — `base_url`, `api_base_url`, deep links for login/register.
 - **`[timeouts]`** — `implicit_wait`, `explicit_wait`, `page_load_timeout` (seconds).
-- **`[api]`** — e.g. `content_type`; **credentials and passwords** used by tests (replace with valid practice accounts for your run).
-
-> **Warning — credentials**  
-> Treat `config/config.ini` as **sensitive** in real projects. Use dedicated test accounts, rotate passwords after sharing, and avoid committing production secrets. For enterprise setups, consider environment variables or a secret manager and thin `config_reader` extensions.
+- **`[api]`** — `content_type`, **credentials** (see [section 8](#8-configure-your-test-credentials)), plus fields used by negative paths (`wrong_password`, `already_registered_email`, etc.).
 
 ### Environment variables
 
@@ -229,10 +256,10 @@ The framework’s **primary** configuration path is **`config.ini`**. You can st
 
 ---
 
-## 9. ▶️ Running tests
+## 10. ▶️ Running tests
 
 > **Convention**  
-> Always invoke pytest as **`python -m pytest`**. Examples below include **`-c <ini>`** for the correct suite and **`--no-header -q`** for a compact console; add **`-v`** when you need per-test names.
+> Always invoke pytest as **`python -m pytest`**. Examples below include **`-c <ini>`** for the correct profile and **`--no-header -q`** for a compact console; add **`-v`** when you need per-test names.
 
 ### UI test execution
 
@@ -275,48 +302,41 @@ python -m pytest -c pytest_stability.ini --no-header -q
 
 | Topic | Explanation |
 |-------|-------------|
-| **Scope** | **75 tests** collected: **50 API** + **25 UI** (full `tests/` tree). |
-| **Why it exists** | Longer combined run to validate **stability** of the full suite under **parallel load** without hiding flakes behind reruns. |
+| **Scope** | Combined **UI + API** tests collected from the full **`tests/`** tree. |
+| **Why it exists** | Longer combined run to validate **stability** under **parallel load** without hiding flakes behind reruns. |
 | **Configuration** | **`pytest_stability.ini`** sets **`addopts = -n 4`** and **does not** add `--reruns` — any failure is a true failure for that run. |
 | **Reports** | **`reports/stability_report_<timestamp>.html`** and **`reports/stability_log_<timestamp>.txt`**. |
-
-### Full suite (UI + API, default reruns + auto workers)
-
-```bash
-python -m pytest -c pytest_all.ini --no-header -q
-```
 
 ### Optional launcher (timestamped HTML path on CLI)
 
 ```bash
 python -m utilities.run_tests ui
 python -m utilities.run_tests api
-python -m utilities.run_tests all
 python -m utilities.run_tests stability
 ```
 
-This wraps **`python -m pytest`** with an explicit **`--html=reports/<prefix>_<timestamp>.html`**.
+This wraps **`python -m pytest`** with an explicit **`--html=reports/<prefix>_<timestamp>.html`**. Use **`ui`**, **`api`**, or **`stability`** only.
 
 ### Windows / Unix helper scripts
 
 | Script | Role |
 |--------|------|
-| `run_tests.bat` / `run_tests.sh` | Example sequences (already use `python -m pytest`). |
+| `run_tests.bat` / `run_tests.sh` | Example `python -m pytest -c …` sequences (align these scripts with the three supported `.ini` files above). |
 | `run_10_times_api-ui.bat` | **10×** API then **10×** UI with per-run HTML under `reports/api/` and `reports/ui/` + summaries. |
-| `run_stability_10x.bat` / `run_all_10_times.*` | Extended stability / multi-run workflows. |
+| `run_stability_10x.bat` / `run_all_10_times.*` | Extended stability / multi-run workflows (typically **`pytest_stability.ini`** / `utilities.run_tests stability`). |
 
 ---
 
-## 10. ⚡ Parallel execution
+## 11. ⚡ Parallel execution
 
 - **`pytest-xdist`** is activated with **`-n <N>`** or **`-n auto`**.
 - **Benefits**: shorter wall-clock time, better CPU use for I/O-bound API tests.
 - **Risks**: shared **mutable** backend state, **UI** contention, and **non-deterministic** ordering — increase workers only after observing stable passes.
-- **Guidance**: **`pytest_stability.ini`** uses **`-n 4`** as a compromise; **`pytest_all.ini`** uses **`-n auto`** for maximum throughput on full suite; **API-only** sequential runs are the safest default for beginners.
+- **Guidance**: **`pytest_stability.ini`** uses **`-n 4`** as a compromise for the combined collection; **API-only** sequential runs are the safest default for beginners; add **`-n`** on UI only when your machine and the target app tolerate the load.
 
 ---
 
-## 11. 📊 Reports & logs
+## 12. 📊 Reports & logs
 
 | Artifact | Location | Description |
 |----------|----------|-------------|
@@ -326,11 +346,11 @@ This wraps **`python -m pytest`** with an explicit **`--html=reports/<prefix>_<t
 | **Failure screenshots** | `reports/screenshots/<test_function_name>.png` | Captured on **call** phase failure in `driver` fixture. |
 | **Batch / stability outputs** | `reports/api/`, `reports/ui/`, `reports/final_stability_summary.txt`, etc. | Created by `.bat` / `.sh` wrappers for multi-run evidence. |
 
-**Timestamp naming** is implemented in **`conftest.py`**: the prefix (`ui`, `api`, `stability`, `all`) is derived from the basename of the **`-c`** INI file so runs never overwrite each other by accident.
+**Timestamp naming** is implemented in **`conftest.py`**: the prefix (`ui`, `api`, `stability`) is derived from the basename of the **`-c`** INI file so runs never overwrite each other by accident.
 
 ---
 
-## 12. ➕ Adding new test cases
+## 13. ➕ Adding new test cases
 
 ### UI tests
 
@@ -355,7 +375,7 @@ This wraps **`python -m pytest`** with an explicit **`--html=reports/<prefix>_<t
 
 ---
 
-## 13. 🧭 Common commands
+## 14. 🧭 Common commands
 
 | Goal | Command |
 |------|---------|
@@ -363,8 +383,7 @@ This wraps **`python -m pytest`** with an explicit **`--html=reports/<prefix>_<t
 | Install deps | `python -m pip install -r requirements.txt` |
 | UI (parallel 4) | `python -m pytest -c pytest_ui.ini --no-header -q -n 4` |
 | API (quiet) | `python -m pytest -c pytest_api.ini --no-header -q` |
-| Stability (75 tests, `-n 4` from INI) | `python -m pytest -c pytest_stability.ini --no-header -q` |
-| Full suite | `python -m pytest -c pytest_all.ini --no-header -q` |
+| Stability (`-n 4` from INI) | `python -m pytest -c pytest_stability.ini --no-header -q` |
 | List tests only | `python -m pytest -c pytest_stability.ini --collect-only -q` |
 | Firefox UI | `python -m pytest -c pytest_ui.ini -n 4 --browser=firefox` |
 | Launcher (UI) | `python -m utilities.run_tests ui` |
@@ -373,7 +392,7 @@ This wraps **`python -m pytest`** with an explicit **`--html=reports/<prefix>_<t
 
 ---
 
-## 14. 🔧 Troubleshooting guide
+## 15. 🔧 Troubleshooting guide
 
 | Symptom | Likely cause | What to try |
 |---------|----------------|-------------|
@@ -386,10 +405,11 @@ This wraps **`python -m pytest`** with an explicit **`--html=reports/<prefix>_<t
 | **Wrong Python version** | Old system Python | Install Python **3.10+** and recreate `venv`. |
 | **Parallel API failures** | Shared account race | Run API **without** `-n` or lower workers; review tests that mutate the same user. |
 | **Stale elements / timeouts** | UI timing | Adjust `[timeouts]` in `config.ini`; improve waits in page objects. |
+| **401 / login failures everywhere** | Missing or wrong `config/config.ini` credentials | Complete [section 8](#8-configure-your-test-credentials) with a valid registered account. |
 
 ---
 
-## 15. 💡 Best practices
+## 16. 💡 Best practices
 
 - **Always use a virtual environment** per project clone.  
 - **Always prefer `python -m pip` and `python -m pytest`** for consistent environments.  
@@ -402,7 +422,7 @@ This wraps **`python -m pytest`** with an explicit **`--html=reports/<prefix>_<t
 
 ---
 
-## 16. 🚀 CI/CD readiness
+## 17. 🚀 CI/CD readiness
 
 - **Non-interactive**: pytest exits with **non-zero** on failures — suitable for **Jenkins**, **GitHub Actions**, **Azure DevOps**, etc.  
 - **Headless**: set **`headless = true`** under `[browser]` in `config/config.ini` for agents without a display.  
@@ -411,7 +431,7 @@ This wraps **`python -m pytest`** with an explicit **`--html=reports/<prefix>_<t
 
 ---
 
-## 17. 🔮 Future enhancements
+## 18. 🔮 Future enhancements
 
 - Pipeline matrix for **Chrome + Firefox** nightly.  
 - Secret injection via **environment variables** or vault integration.  
@@ -421,10 +441,10 @@ This wraps **`python -m pytest`** with an explicit **`--html=reports/<prefix>_<t
 
 ---
 
-## 18. 👥 Contributors & ownership
+## 19. 👥 Contributors & ownership
 
 Document your team’s ownership here (for example squad name, Slack channel, and escalation path). For external contributions, add **`CONTRIBUTING.md`** with branch naming, PR checklist, and review rules when your organization requires it.
 
 ---
 
-**Happy testing** — start with **`python -m pytest -c pytest_api.ini --no-header -q`** for a quick API smoke, then **`python -m pytest -c pytest_ui.ini --no-header -q -n 4`** once Chrome/Firefox is installed and `config.ini` points at valid practice credentials.
+**Happy testing** — configure **`config/config.ini`**, then start with **`python -m pytest -c pytest_api.ini --no-header -q`** for a quick API smoke, then **`python -m pytest -c pytest_ui.ini --no-header -q -n 4`** once Chrome/Firefox is installed.
