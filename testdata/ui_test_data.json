@@ -1,0 +1,29 @@
+{
+  "valid_user": {
+    "email": "",
+    "password": ""
+  },
+  "invalid_users": [
+    {
+      "case": "invalid_email_format",
+      "email": "notanemail",
+      "password": "wrong"
+    },
+    {
+      "case": "wrong_password",
+      "email": "valid.email@example.com",
+      "password": "wrongpassword"
+    },
+    {
+      "case": "empty_fields",
+      "email": "",
+      "password": ""
+    }
+  ],
+  "note_data": {
+    "title": "Sample Note",
+    "description": "Sample Description",
+    "category": "Home"
+  }
+}
+

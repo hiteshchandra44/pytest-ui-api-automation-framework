@@ -1,0 +1,47 @@
+.pytest_cache/
+logs/
+reports/screenshots/
+
+reports/
+
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Virtual Environment
+venv/
+.env/
+.venv/
+
+# Pytest
+.pytest_cache/
+
+# Reports
+reports/
+logs/
+
+# Screenshots
+screenshots/
+
+# IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Coverage
+htmlcov/
+.coverage
+
+# Selenium Drivers
+drivers/
+
+
+# Misc
+*.log

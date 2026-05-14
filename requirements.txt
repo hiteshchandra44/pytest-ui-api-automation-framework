@@ -1,0 +1,9 @@
+pytest
+selenium
+requests
+pytest-xdist
+pytest-html
+pytest-rerunfailures
+webdriver-manager
+configparser
+

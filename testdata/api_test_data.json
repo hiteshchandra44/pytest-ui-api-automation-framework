@@ -1,0 +1,39 @@
+{
+  "valid_credentials": {
+    "email": "",
+    "password": ""
+  },
+  "invalid_token": "invalid_token_string",
+  "note_payloads": [
+    {
+      "title": "API Sample Note Home",
+      "description": "Sample API note description for Home category",
+      "category": "Home"
+    },
+    {
+      "title": "API Sample Note Work",
+      "description": "Sample API note description for Work category",
+      "category": "Work"
+    },
+    {
+      "title": "API Sample Note Personal",
+      "description": "Sample API note description for Personal category",
+      "category": "Personal"
+    }
+  ],
+  "invalid_note_payloads": [
+    {
+      "description": "Missing title should be invalid",
+      "category": "Home"
+    },
+    {
+      "title": "Missing description should be invalid",
+      "category": "Work"
+    },
+    {
+      "title": "Missing category should be invalid",
+      "description": "This payload omits category"
+    }
+  ]
+}
+
